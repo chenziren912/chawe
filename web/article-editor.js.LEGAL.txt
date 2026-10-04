@@ -1,0 +1,114 @@
+Bundled license information:
+
+react/cjs/react.production.js:
+  /**
+   * @license React
+   * react.production.js
+   *
+   * Copyright (c) Meta Platforms, Inc. and affiliates.
+   *
+   * This source code is licensed under the MIT license found in the
+   * LICENSE file in the root directory of this source tree.
+   */
+
+scheduler/cjs/scheduler.production.js:
+  /**
+   * @license React
+   * scheduler.production.js
+   *
+   * Copyright (c) Meta Platforms, Inc. and affiliates.
+   *
+   * This source code is licensed under the MIT license found in the
+   * LICENSE file in the root directory of this source tree.
+   */
+
+react-dom/cjs/react-dom.production.js:
+  /**
+   * @license React
+   * react-dom.production.js
+   *
+   * Copyright (c) Meta Platforms, Inc. and affiliates.
+   *
+   * This source code is licensed under the MIT license found in the
+   * LICENSE file in the root directory of this source tree.
+   */
+
+react-dom/cjs/react-dom-client.production.js:
+  /**
+   * @license React
+   * react-dom-client.production.js
+   *
+   * Copyright (c) Meta Platforms, Inc. and affiliates.
+   *
+   * This source code is licensed under the MIT license found in the
+   * LICENSE file in the root directory of this source tree.
+   */
+
+react/cjs/react-jsx-runtime.production.js:
+  /**
+   * @license React
+   * react-jsx-runtime.production.js
+   *
+   * Copyright (c) Meta Platforms, Inc. and affiliates.
+   *
+   * This source code is licensed under the MIT license found in the
+   * LICENSE file in the root directory of this source tree.
+   */
+
+medium-zoom/dist/medium-zoom.esm.js:
+  /*! medium-zoom 1.1.0 | MIT License | https://github.com/francoischalifour/medium-zoom */
+
+lucide-react/dist/esm/shared/src/utils/toKebabCase.mjs:
+lucide-react/dist/esm/shared/src/utils/toLucideIconData.mjs:
+lucide-react/dist/esm/shared/src/utils/toCamelCase.mjs:
+lucide-react/dist/esm/shared/src/utils/toPascalCase.mjs:
+lucide-react/dist/esm/shared/src/utils/mergeClasses.mjs:
+lucide-react/dist/esm/shared/src/build/defaultAttributes.mjs:
+lucide-react/dist/esm/shared/src/build/buildLucideIconNode.mjs:
+lucide-react/dist/esm/shared/src/build/buildLucideIconForReact.mjs:
+lucide-react/dist/esm/shared/src/utils/hasA11yProp.mjs:
+lucide-react/dist/esm/context.mjs:
+lucide-react/dist/esm/Icon.mjs:
+lucide-react/dist/esm/createLucideIcon.mjs:
+lucide-react/dist/esm/icons/bold.mjs:
+lucide-react/dist/esm/icons/chart-area.mjs:
+lucide-react/dist/esm/icons/code-xml.mjs:
+lucide-react/dist/esm/icons/code.mjs:
+lucide-react/dist/esm/icons/expand.mjs:
+lucide-react/dist/esm/icons/eye.mjs:
+lucide-react/dist/esm/icons/forward.mjs:
+lucide-react/dist/esm/icons/heading.mjs:
+lucide-react/dist/esm/icons/image.mjs:
+lucide-react/dist/esm/icons/italic.mjs:
+lucide-react/dist/esm/icons/link.mjs:
+lucide-react/dist/esm/icons/list-ordered.mjs:
+lucide-react/dist/esm/icons/list-tree.mjs:
+lucide-react/dist/esm/icons/list-todo.mjs:
+lucide-react/dist/esm/icons/list.mjs:
+lucide-react/dist/esm/icons/maximize-2.mjs:
+lucide-react/dist/esm/icons/minimize-2.mjs:
+lucide-react/dist/esm/icons/quote.mjs:
+lucide-react/dist/esm/icons/reply.mjs:
+lucide-react/dist/esm/icons/save.mjs:
+lucide-react/dist/esm/icons/shrink.mjs:
+lucide-react/dist/esm/icons/square-code.mjs:
+lucide-react/dist/esm/icons/square-sigma.mjs:
+lucide-react/dist/esm/icons/strikethrough.mjs:
+lucide-react/dist/esm/icons/subscript.mjs:
+lucide-react/dist/esm/icons/superscript.mjs:
+lucide-react/dist/esm/icons/table.mjs:
+lucide-react/dist/esm/icons/trash.mjs:
+lucide-react/dist/esm/icons/underline.mjs:
+lucide-react/dist/esm/icons/upload.mjs:
+lucide-react/dist/esm/icons/view.mjs:
+lucide-react/dist/esm/icons/x.mjs:
+lucide-react/dist/esm/lucide-react.mjs:
+  /**
+   * @license lucide-react v1.51.0 - ISC
+   *
+   * This source code is licensed under the ISC license.
+   * See the LICENSE file in the root directory of this source tree.
+   */
+
+dompurify/dist/purify.es.mjs:
+  /*! @license DOMPurify 3.3.3 | (c) Cure53 and other contributors | Released under the Apache license 2.0 and Mozilla Public License 2.0 | github.com/cure53/DOMPurify/blob/3.3.3/LICENSE */

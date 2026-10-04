@@ -1,0 +1,17 @@
+.pinned-banner{display:flex;align-items:center;gap:4px;flex-shrink:0;margin:5px 9px 0;padding:4px 5px 4px 10px;border:1px solid var(--glass-border);border-radius:15px;background:var(--glass-popup);backdrop-filter:blur(var(--glass-blur)) saturate(140%);-webkit-backdrop-filter:blur(var(--glass-blur)) saturate(140%);box-shadow:0 3px 12px #20516c12;z-index:7;overflow:hidden;min-height:54px}
+.pinned-banner[hidden]{display:none}
+.pinned-jump{flex:1;min-width:0;display:flex;align-items:center;gap:9px;background:transparent;text-align:left;padding:2px 8px;border-radius:10px;min-height:44px}
+.pinned-indicator{display:block;width:3px;height:38px;flex:0 0 3px;overflow:hidden;border-radius:2px;pointer-events:none}
+.pinned-indicator-track{display:flex;flex-direction:column;gap:3px;transition:transform var(--pin-indicator-duration,280ms) cubic-bezier(.2,.8,.2,1)}
+.pinned-indicator-segment{display:block;height:var(--pin-segment-height,38px);flex:0 0 var(--pin-segment-height,38px);background:#3697d8;border-radius:2px;opacity:.3;transition:opacity var(--pin-indicator-duration,280ms) ease}
+.pinned-indicator-segment.is-active{opacity:1}
+.pinned-content{display:grid;gap:5px;min-width:0;flex:1}
+.pinned-content strong{font-size:12px;font-weight:600;color:#318dca}
+.pinned-content>span{font-size:13px;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;color:#2e4658;line-height:18px}
+.pinned-banner .icon-button{width:34px;height:34px;flex:0 0 34px;color:#537b96}
+.pins-dialog{max-height:80dvh;display:flex;flex-direction:column}
+.pins-list-content{min-height:0;overflow:auto;margin-top:12px}
+.pins-list-row{display:grid;gap:7px;text-align:left;background:var(--glass-control);border-radius:14px;width:100%;padding:14px;margin-bottom:8px}
+.pins-list-row strong{color:#328bc3;font-size:12px}
+.pins-list-row span{font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bubble.is-pin-jump{box-shadow:0 0 0 3px #369fe866,0 0 26px #65b5ed55;transition:box-shadow var(--motion-300,300ms)}

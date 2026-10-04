@@ -1,0 +1,20 @@
+/* Scrolling still belongs to the viewport; these rails are independent of its content. */
+html,body,body *{scrollbar-width:none!important;scrollbar-gutter:auto!important}
+html::-webkit-scrollbar,body::-webkit-scrollbar,body *::-webkit-scrollbar{display:none!important;width:0!important;height:0!important}
+.chawe-scroll-viewport:focus{outline:none}
+.chawe-scroll-viewport:focus-visible{outline:2px solid var(--accent,#3390ec);outline-offset:-2px}
+.chawe-scrollbar{position:fixed;box-sizing:border-box;display:block;touch-action:none;user-select:none;-webkit-user-select:none;cursor:pointer;contain:layout style;opacity:.72;transition:opacity var(--motion-160,160ms);padding:0;border:0;background:none}
+.chawe-scrollbar[hidden]{display:none!important}
+.chawe-scrollbar[data-axis="y"]{width:14px}
+.chawe-scrollbar[data-axis="x"]{height:14px}
+.chawe-scrollbar-thumb{position:absolute;box-sizing:border-box;display:block;border-radius:99px;background:linear-gradient(145deg,rgba(245,252,255,.58),rgba(91,154,193,.38));border:1px solid rgba(255,255,255,.60);box-shadow:0 1px 5px #24496728,inset 0 0 0 1px #5e90b32b;backdrop-filter:blur(var(--glass-blur,14px)) saturate(140%);-webkit-backdrop-filter:blur(var(--glass-blur,14px)) saturate(140%);cursor:grab;pointer-events:none}
+.chawe-scrollbar[data-axis="y"]>.chawe-scrollbar-thumb{top:0;left:5px;width:5px;transition:width var(--motion-160,160ms),left var(--motion-160,160ms)}
+.chawe-scrollbar[data-axis="x"]>.chawe-scrollbar-thumb{left:0;top:5px;height:5px;transition:height var(--motion-160,160ms),top var(--motion-160,160ms)}
+.chawe-scrollbar:hover,.chawe-scrollbar.is-dragging{opacity:1}
+.chawe-scrollbar:hover>.chawe-scrollbar-thumb,.chawe-scrollbar.is-dragging>.chawe-scrollbar-thumb{background:rgba(204,232,250,.72)}
+.chawe-scrollbar[data-axis="y"]:hover>.chawe-scrollbar-thumb,.chawe-scrollbar[data-axis="y"].is-dragging>.chawe-scrollbar-thumb{left:4px;width:7px}
+.chawe-scrollbar[data-axis="x"]:hover>.chawe-scrollbar-thumb,.chawe-scrollbar[data-axis="x"].is-dragging>.chawe-scrollbar-thumb{top:4px;height:7px}
+.chawe-scrollbar.is-dragging{cursor:grabbing}
+@media(prefers-reduced-motion:reduce){.chawe-scrollbar,.chawe-scrollbar-thumb{transition:none!important}}
+html[data-reduce-motion="1"] .chawe-scrollbar,html[data-reduce-motion="1"] .chawe-scrollbar-thumb{transition:none!important}
+@media(prefers-reduced-transparency:reduce){.chawe-scrollbar-thumb{background:#9cbed6;backdrop-filter:none;-webkit-backdrop-filter:none}}

@@ -1,0 +1,8 @@
+.account-auth-back{position:fixed;z-index:60;left:max(16px,env(safe-area-inset-left));top:max(16px,env(safe-area-inset-top));display:grid;place-items:center;width:42px;height:42px;padding:0;border:1px solid var(--border,#dce5ec);border-radius:50%;color:var(--foreground,#263747);background:color-mix(in srgb,var(--background,#fff) 88%,transparent);box-shadow:0 3px 14px #2449680c;backdrop-filter:blur(14px);cursor:pointer;transition:background .16s,transform .16s;animation:account-back-enter .22s ease-out}
+.account-auth-back svg{width:23px;height:23px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.account-auth-back:hover{background:var(--muted,#edf2f5)}
+.account-auth-back:active{transform:scale(.94)}
+.account-auth-back:focus-visible{outline:2px solid #3390ec;outline-offset:3px}
+@keyframes account-back-enter{from{opacity:0;transform:translateX(-10px)}to{opacity:1;transform:translateX(0)}}
+@media(prefers-reduced-motion:reduce){.account-auth-back{animation:none;transition:none}}
+html[data-reduce-motion="1"] .account-auth-back{animation:none;transition:none}

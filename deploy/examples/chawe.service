@@ -1,0 +1,25 @@
+[Unit]
+Description=Chawe chat server
+After=network.target
+
+[Service]
+Type=simple
+User=chawe
+Group=chawe
+WorkingDirectory=/opt/chawe
+Environment=CHAWE_DATA_DIR=/var/lib/chawe
+Environment=CHAWE_WEB_DIR=/opt/chawe/web
+Environment=CHAWE_PUBLIC_ORIGIN=https://chat.example.org
+Environment=CHAWE_PORT=8080
+ExecStart=/usr/bin/java -Xms32m -Xmx192m -jar /opt/chawe/chawe.jar
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/chawe
+MemoryMax=320M
+
+[Install]
+WantedBy=multi-user.target

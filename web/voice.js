@@ -37,6 +37,7 @@ window.chaweVoice = (() => {
     const r=recording;if(!r)return;
     const live=r.phase==='recording',sending=r.phase==='sending'||r.phase==='cancelling'||r.preparing||r.cancelIntent,waiting=r.phase==='requesting';
     $('voice-recorder').classList.toggle('is-recording',live);$('voice-recorder').classList.toggle('is-uploading',sending);
+    $('voice-recorder').classList.toggle('has-record-status',!!r.error||waiting||sending);
     $('voice-pause').innerHTML=icon(live?'pause':'mic');$('voice-pause').setAttribute('aria-label',live?'暂停录音':'继续录音');$('voice-pause').disabled=sending||waiting||r.transitioning||r.recorder?.state==='inactive'||!!r.id;
     $('voice-once').hidden=false;$('voice-once').classList.toggle('is-selected',r.once);$('voice-once').setAttribute('aria-pressed',String(r.once));$('voice-once').disabled=sending||!!r.id;
     $('voice-once').title=/^group:/.test(r.peer)?'一次性语音 · 每位接收成员各听一次':'一次性语音 · 接收方只能听一次';
@@ -46,6 +47,7 @@ window.chaweVoice = (() => {
     $('voice-send').innerHTML=sending?'<span class="composer-spinner"></span>':icon('send');
     $('voice-record-hint').textContent=waiting?'正在申请麦克风权限…':r.cancelIntent?r.error||'正在取消发送…':r.preparing?'正在准备录音…':sending?'正在发送 '+Math.round(r.progress||0)+'%':live?r.once?'录音中 · 一次性语音':'录音中':r.once?/^group:/.test(r.peer)?'一次性语音 · 每位接收成员各听一次':'一次性语音 · 仅接收方可播放一次':'已暂停 · 可试听或继续录音';
     if(r.error && !sending && !waiting)$('voice-record-hint').textContent=r.error;
+    $('voice-record-hint').title=$('voice-record-hint').textContent;
     ctx.changed();
   }
   function waveOf(r) {
@@ -61,7 +63,9 @@ window.chaweVoice = (() => {
         if(r.peaks.length>=4096){const next=[];for(let i=0;i<r.peaks.length;i+=2)next.push(Math.max(r.peaks[i],r.peaks[i+1]||0));r.peaks=next;r.interval*=2;}}
     }
     const seconds=elapsed(r)/1000,preview=r.phase==='paused'&&r.preview?r.preview.currentTime:0;
-    $('voice-clock').textContent=r.preview&&!r.preview.paused?clock(preview)+' / '+clock(seconds):clock(seconds)+','+String(Math.floor(elapsed(r)%1000/10)).padStart(2,'0');
+    const previewing=r.phase==='paused'&&r.preview&&!r.preview.paused;
+    $('voice-clock').textContent=previewing?clock(preview):clock(seconds)+','+String(Math.floor(elapsed(r)%1000/10)).padStart(2,'0');
+    $('voice-clock').title=previewing?'试听 '+clock(preview)+' / '+clock(seconds):'录音时长 '+clock(seconds);
     bars($('voice-record-wave'),waveOf(r),seconds?preview/seconds:0);
     r.raf=requestAnimationFrame(()=>recordFrame(r));
   }

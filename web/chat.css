@@ -124,6 +124,7 @@
 .profile-actions button{display:flex;align-items:center;gap:16px;background:transparent;color:#2987d8;text-align:left;min-height:48px;padding:10px 9px;border-radius:10px;font-size:14px}
 .profile-actions button:hover{background:#edf6ff}
 .profile-actions button:disabled{opacity:.5;cursor:default}
+.profile-actions button.danger-action{color:#de4756}
 .profile-actions svg{width:20px;height:20px}
 #profile-remove,#profile-block{color:#dc5360}
 .action-dialog input{width:100%;border:1px solid #d5e0e8;border-radius:10px;padding:12px;outline-color:#3390ec;background:#fff;color:#263747}

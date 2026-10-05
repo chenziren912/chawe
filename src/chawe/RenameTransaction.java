@@ -100,8 +100,8 @@ final class RenameTransaction {
             try(var files=Files.newDirectoryStream(tx.root.resolve("chats"),"*.log")) {
                 for(Path file:files) {
                     String name=file.getFileName().toString(),relative="chats/"+name;
-                    if(name.startsWith("group-")){tx.groupChat(relative,user,"__deleted_"+identity.substring(0,10));continue;}
-                    if(!renamedChat(name,user,"__deleted_"+identity.substring(0,10)).equals(name)){tx.plan.add("D\t"+relative);if(Files.exists(tx.root.resolve(relative+".changes")))tx.plan.add("D\t"+relative+".changes");}
+                    if(name.startsWith("group-")){tx.groupChat(relative,user,"__deleted_"+identity);continue;}
+                    if(!renamedChat(name,user,"__deleted_"+identity).equals(name)){tx.plan.add("D\t"+relative);if(Files.exists(tx.root.resolve(relative+".changes")))tx.plan.add("D\t"+relative+".changes");}
                 }
             }
             tx.bytes("groups-v1.tsv",groups);tx.bytes("account-identities-v1.tsv",identities);

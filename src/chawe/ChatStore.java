@@ -471,16 +471,20 @@ final class ChatStore {
     }
 
     private static boolean member(String id, String sender) {
-        if (id.matches("group-[a-f0-9]{32}\\.log")) return AccountStore.validUsername(sender);
+        if (id.matches("group-[a-f0-9]{32}\\.log")) return validSender(sender);
         if (id.startsWith("self-")) return id.equals("self-" + sender + ".log");
         String[] people = people(id);
         return people != null && (people[0].equals(sender) || people[1].equals(sender));
     }
 
+    // The full identity makes this marker longer than any registrable username.
+    private static boolean validSender(String sender) {
+        return AccountStore.validUsername(sender) || sender != null && sender.matches("__deleted_[a-f0-9]{32}");
+    }
     private static Message parse(String line) throws IOException {
         try {
             String[] parts = line.split("\t", -1);
-            if ((parts.length != 4 && parts.length != 5 && parts.length != 6) || !AccountStore.validUsername(parts[2])) throw new IllegalArgumentException();
+            if ((parts.length != 4 && parts.length != 5 && parts.length != 6) || !validSender(parts[2])) throw new IllegalArgumentException();
             byte[] text = Base64.getDecoder().decode(parts[3]);
             Attachment attachment = parts.length >= 5 && !parts[4].isEmpty() && remarkId(parts) == null ? decodeAttachment(parts[4]) : null;
             String topic = parts.length == 6 && parts[5].startsWith("topic:") ? parts[5].substring(6) : "general";

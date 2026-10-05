@@ -35,8 +35,25 @@
 .chawe-md-preview.md-editor{background:transparent;--md-bk-color:transparent;--md-color:#253e54;--md-border-color:var(--glass-border)}
 .article-dialog .md-editor-preview-wrapper{padding:0}
 .chawe-md-editor .md-editor-preview,.chawe-md-preview .md-editor-preview{color:#243f54;overflow-wrap:anywhere;white-space:normal;font-family:inherit;font-size:15px;line-height:1.8}
-.chawe-md-editor .md-editor-preview pre,.chawe-md-preview .md-editor-preview pre{white-space:pre;max-width:100%;background:rgba(238,247,255,.54)!important;border:1px solid var(--glass-border);border-radius:12px}
-.md-editor .md-editor-preview code{background:rgba(195,222,242,.28)}
+:is(.chawe-md-editor,.chawe-md-preview) .md-editor-preview{word-break:normal;min-width:0}
+:is(.chawe-md-editor,.chawe-md-preview) .md-editor-preview :not(pre)>code:not(.language-plaintext){padding:2px 5px;border-radius:5px;background:rgba(195,222,242,.35);font-family:"Cascadia Code","SFMono-Regular",Consolas,monospace;font-size:.9em}
+:is(.chawe-md-editor,.chawe-md-preview) .md-editor-preview .md-editor-code{max-width:100%;margin:18px 0;overflow:hidden;border:1px solid #30455d;border-radius:12px;background:#102033;box-shadow:0 3px 12px #16334d15}
+:is(.chawe-md-editor,.chawe-md-preview) .md-editor-code .md-editor-code-head{display:flex;align-items:center;min-height:38px;padding:6px 14px;background:#1a2d43;border-bottom:1px solid #30455d;color:#b8cce0;line-height:24px;user-select:none}
+:is(.chawe-md-editor,.chawe-md-preview) .md-editor-code .md-editor-code-flag{display:none}
+:is(.chawe-md-editor,.chawe-md-preview) .md-editor-code .md-editor-code-action{position:static;display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%}
+:is(.chawe-md-editor,.chawe-md-preview) .md-editor-code .md-editor-code-lang{font-family:"Cascadia Code",Consolas,monospace;font-size:12px;font-weight:500;color:#9dc8ed}
+:is(.chawe-md-editor,.chawe-md-preview) .md-editor-code .md-editor-copy-button{position:static;display:inline-flex;align-items:center;padding:1px 8px;border-radius:6px;font-size:12px;color:#c6dced;background:transparent;cursor:pointer}
+:is(.chawe-md-editor,.chawe-md-preview) .md-editor-code .md-editor-copy-button:hover{background:#ffffff14;color:#fff}
+:is(.chawe-md-editor,.chawe-md-preview) .md-editor-preview pre{max-width:100%;margin:0;padding:14px 0;background:#102033!important;border:0;border-radius:0;overflow:auto;white-space:pre;word-break:normal;overflow-wrap:normal}
+:is(.chawe-md-editor,.chawe-md-preview) .md-editor-preview pre code{display:block;width:max-content;min-width:100%;box-sizing:border-box;padding:0 16px;overflow:visible;background:transparent!important;color:#e6edf3;font-family:"Cascadia Code","SFMono-Regular",Consolas,"Liberation Mono",monospace;font-size:13px;line-height:1.7;letter-spacing:normal;white-space:pre;word-break:normal;overflow-wrap:normal;tab-size:4}
+:is(.chawe-md-editor,.chawe-md-preview) .md-editor-preview pre code .md-editor-code-block-lines{display:block;white-space:normal}
+:is(.chawe-md-editor,.chawe-md-preview) .md-editor-preview pre code .md-editor-code-line-content{white-space:pre;word-break:normal;overflow-wrap:normal}
+:is(.chawe-md-editor,.chawe-md-preview) .md-editor-code-line [rn-wrapper]{color:#7891aa;border-color:#30455d;user-select:none}
+:is(.chawe-md-editor,.chawe-md-preview) .md-editor-code-line-highlight{background:#4d9ee321}
+:is(.chawe-md-editor,.chawe-md-preview) .katex{color:#243f54;white-space:nowrap}
+:is(.chawe-md-editor,.chawe-md-preview) .md-editor-katex-block{max-width:100%;overflow-x:auto;overflow-y:hidden;padding:6px 0}
+:is(.chawe-md-editor,.chawe-md-preview) .katex-display{margin:1em 0}
+:is(.chawe-md-editor,.chawe-md-preview) .katex svg{flex-shrink:initial;stroke-width:1;stroke-linecap:butt;stroke-linejoin:miter}
 .chawe-md-editor .md-editor-preview a,.chawe-md-preview .md-editor-preview a{color:#1687dc}
 .chawe-md-editor .md-editor-preview img,.chawe-md-preview .md-editor-preview img{max-width:100%;border-radius:12px}
 .chawe-md-editor .md-editor-preview table,.chawe-md-preview .md-editor-preview table{display:block;max-width:100%;overflow:auto;white-space:normal}

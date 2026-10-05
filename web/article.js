@@ -4,7 +4,7 @@ window.chaweArticles = (() => {
   const MAX_BYTES = 262144, MAX_CHARACTERS = 100000;
   let ctx, state = null, editor = null, libraryPromise, saveTimer, preview = null, view = null, viewEpoch = 0, scrollFrame = 0;
   const randomId = () => Array.from(crypto.getRandomValues(new Uint8Array(16)),n => n.toString(16).padStart(2,'0')).join('');
-  const load = () => libraryPromise ||= import('/article-editor.js?v=e3a293f054d7dd71754161477504ffb25503d5f2fb4b45a8a62ecb042658a6eb').catch(error => { libraryPromise = null; throw error; });
+  const load = () => libraryPromise ||= import('/article-editor.js?v=4cb2735a73721cb581f135362729f71340bd4f58e595470200fc7560be02b179').catch(error => { libraryPromise = null; throw error; });
   const keyOf = s => 'chawe.article-draft.v1.' + s.accountId + '.' + s.peerId + (/^group:/.test(s.peer)?'.'+(s.topic || 'general'):'');
   const limitError = value => encoder.encode(value).length > MAX_BYTES || Array.from(value).length > MAX_CHARACTERS;
   function normalize(a) {

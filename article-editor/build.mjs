@@ -1,9 +1,18 @@
 import { build } from 'esbuild';
 import { readFile,writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
+import { dirname } from 'node:path';
 const result = await build({
   entryPoints: ['src.jsx'], bundle: true, minify: true, format: 'esm', target: ['chrome105','safari16'],
   outfile: '../web/article-editor.js', legalComments: 'linked',
+  loader: { '.woff2': 'dataurl' },
+  plugins: [{ name: 'bundled-math-fonts', setup(builder) {
+    builder.onLoad({filter:/katex\.min\.css$/},async args => ({
+      // Our target browsers support WOFF2. Embed those fonts and remove legacy duplicates.
+      contents: (await readFile(args.path,'utf8')).replace(/,url\([^)]*\.(?:woff|ttf)\) format\("(?:woff|truetype)"\)/g,''),
+      loader:'css', resolveDir:dirname(args.path)
+    }));
+  } }],
   define: { 'process.env.NODE_ENV': '"production"' },
   metafile: true,
   logLevel: 'info'
@@ -16,7 +25,7 @@ for (const output of Object.values(result.metafile.outputs)) {
   }
 }
 const notices = [];
-for (const name of ['md-editor-rt','react','react-dom','dompurify','highlight.js']) {
+for (const name of ['md-editor-rt','react','react-dom','dompurify','highlight.js','katex']) {
   const entry = JSON.parse(await readFile('node_modules/' + name + '/package.json','utf8'));
   let license = '';
   for (const file of ['LICENSE','LICENSE.md','LICENSE.txt']) {

@@ -3,13 +3,18 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "scripts": { "build": "node build.mjs" },
+  "scripts": {
+    "build": "node build.mjs"
+  },
   "dependencies": {
     "dompurify": "3.3.3",
     "highlight.js": "11.11.1",
+    "katex": "0.19.0",
     "md-editor-rt": "7.1.0",
     "react": "19.2.4",
     "react-dom": "19.2.4"
   },
-  "devDependencies": { "esbuild": "0.27.4" }
+  "devDependencies": {
+    "esbuild": "0.27.4"
+  }
 }

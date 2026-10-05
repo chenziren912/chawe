@@ -62,6 +62,10 @@ final class AccountIdentities {
         return serialize(updated,Math.addExact(generation,1));
     }
     static boolean validId(String id) { return id != null && id.matches("[a-f0-9]{32}"); }
+    synchronized byte[] deleted(String user) {
+        Map<String,Identity> updated=new LinkedHashMap<>(identities);if(updated.remove(user)==null)throw new IllegalArgumentException("user_not_found");
+        return serialize(updated,Math.addExact(generation,1));
+    }
     private String newId() { String id; do { id = UUID.randomUUID().toString().replace("-",""); } while (username(id) != null); return id; }
     private static byte[] serialize(Map<String,Identity> values,long generation) {
         StringBuilder text = new StringBuilder("# chawe-account-identities-v1\t").append(generation).append('\n');

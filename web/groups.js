@@ -12,8 +12,8 @@ window.chaweGroups = (() => {
   const isGroup = peer => /^group:[a-f0-9]{32}$/.test(peer || '');
   const of = peer => groups.get(isGroup(peer)?peer.slice(6):peer);
   const topicOf = peer => isGroup(peer)?selectedTopics.get(peer.slice(6)) || 'general':'general';
-  const canManage = (g,right) => g?.myRole==='owner' || g?.myRole==='admin' && g.myRights.includes(right);
-  const can = (g,permission) => {if(!g?.joined)return false;const right={changeInfo:'changeInfo',addMembers:'inviteUsers',topics:'manageTopics',pinMessages:'pinMessages'}[permission];return g.myRole==='owner'||g.permissions.includes(permission)||g.myRole==='admin'&&(!right||g.myRights.includes(right));};
+  const canManage = (g,right) => !!g?.joined && (g.superAdmin || g.myRole==='owner' || g.myRole==='admin' && g.myRights.includes(right));
+  const can = (g,permission) => {if(!g?.joined)return false;const right={changeInfo:'changeInfo',addMembers:'inviteUsers',topics:'manageTopics',pinMessages:'pinMessages'}[permission];return g.superAdmin||g.myRole==='owner'||g.permissions.includes(permission)||g.myRole==='admin'&&(!right||g.myRights.includes(right));};
   const current = () => groups.get(editing);
   const creationContacts = () => creation?.contacts || ctx.contacts();
   const icon = name => '<svg aria-hidden="true"><use href="#i-'+name+'"/></svg>';
@@ -191,7 +191,7 @@ window.chaweGroups = (() => {
     const host=node('div','group-settings-page');host.tabIndex=-1;renderHost=host;page=next;pageData=data;
     const titles={main:'编辑群聊',type:'群类型',permissions:'成员权限',reactions:'消息回应',admins:'管理员',admin:'管理员权限',invites:'邀请链接',invite:'编辑邀请链接','invite-create':'创建邀请链接',members:'成员',topics:'话题'};
     $('group-settings-title').textContent=titles[next] || '群设置';$('group-settings-save').hidden=next!=='main';$('group-settings-save').disabled=!can(g,'changeInfo');
-    const owner=g.myRole==='owner',manager=canManage(g,'changeInfo');
+    const owner=g.myRole==='owner'||g.superAdmin,manager=canManage(g,'changeInfo');
     if(next==='main'){
       if(!draft)draft={name:g.name,description:g.description};const photo=button('设置群头像',null,()=>chooseAvatar('edit'),'group-settings-photo');const image=node('span','avatar');paintPhoto(image,g);photo.prepend(image);photo.disabled=!can(g,'changeInfo');host.append(photo);
       if(g.avatarUrl){const reset=button('恢复默认群头像',null,()=>confirm({title:'恢复默认群头像？',label:'确认恢复',action:async()=>{await mutate('avatar/reset',{version:current().version});showPage('main');}}),'group-reset-avatar');reset.disabled=!can(g,'changeInfo');host.append(reset);}
@@ -200,14 +200,14 @@ window.chaweGroups = (() => {
       settingsRow(card,'群类型',g.type==='public'?'公开 · @'+g.handle:'私密','lock',()=>showPage('type'),!owner);
       settingsRow(card,'成员权限',g.permissions.length+'/'+Object.keys(permissions).length,'document',()=>showPage('permissions'),!owner);
       settingsRow(card,'消息回应',g.reactionMode==='all'?'所有表情':g.reactionMode==='none'?'关闭':g.allowedReactions.length+' 个表情','smile',()=>showPage('reactions'),!manager);
-      settingsRow(card,'管理员',String(g.members.filter(m=>m.role!=='member').length),'user',()=>showPage('admins'));
+      settingsRow(card,'管理员',String(g.members.filter(m=>m.superAdmin||m.role!=='member').length),'user',()=>showPage('admins'));
       settingsRow(card,'邀请链接',String(g.invites.filter(i=>!i.revoked).length),'link',()=>showPage('invites'),!canManage(g,'inviteUsers'));
       card.append(checkbox('启用话题',g.topicsEnabled,safe(async()=>{await saveFields({topicsEnabled:String(!g.topicsEnabled)});ctx.header();showPage('main');}),!manager),note('启用后可在不同话题中分别交流。'));
       if(g.topicsEnabled)settingsRow(card,'管理话题',String(g.topics.length),'article',()=>showPage('topics'));
       const people=section();settingsRow(people,'成员',String(g.memberCount),'users',()=>showPage('members'));
       people.append(checkbox('新成员可见完整历史',g.history,safe(async()=>{await saveFields({history:String(!g.history)});showPage('main');}),!manager),note('关闭后，新成员最多看到加入前的 100 条消息。'));
-      if(owner)section().append(button('删除群聊','trash',()=>deleteOrLeave('group:'+g.id),'group-row danger-action'));
-      else host.append(note('只有群主可修改群类型、成员权限和管理员。'));
+      if(owner)section().append(button('解散群聊','trash',()=>deleteOrLeave('group:'+g.id,true),'group-row danger-action'));
+      else host.append(note('群主及超级管理员可修改群类型、成员权限和管理员。'));
     }else if(next==='type'){
       const card=section(),field=textField('公开群用户名',g.handle,32);let type=g.type;
       const select=choices('群类型',[['private','私密群','只能通过邀请链接或成员邀请加入'],['public','公开群','可以搜索群名称或群用户名加入']],type,value=>{type=value;field.wrap.hidden=value!=='public';});
@@ -221,8 +221,8 @@ window.chaweGroups = (() => {
       for(const emoji of emojis){const b=button(emoji,null,()=>{chosen.has(emoji)?chosen.delete(emoji):chosen.add(emoji);b.setAttribute('aria-pressed',String(chosen.has(emoji)));},'group-emoji');b.setAttribute('aria-pressed',String(chosen.has(emoji)));grid.append(b);}
       card.append(select,grid,button('保存','sent',safe(async()=>{await saveFields({reactionMode:mode,allowedReactions:Array.from(chosen).join(',')});showPage('main');})));
     }else if(next==='members'||next==='admins'){
-      const card=section(),members=next==='admins'?g.members.filter(m=>m.role!=='member'):g.members;
-      for(const p of members)card.append(memberRow(p,p.role==='owner'?'群主':p.role==='admin'?'管理员':'成员',()=>memberActions(p)));
+      const card=section(),members=next==='admins'?g.members.filter(m=>m.superAdmin||m.role!=='member'):g.members;
+      for(const p of members)card.append(memberRow(p,p.superAdmin?(p.role==='owner'?'超级管理员 · 群主':'超级管理员'):p.role==='owner'?'群主':p.role==='admin'?'管理员':'成员',()=>memberActions(p)));
       if(next==='members'&&can(g,'addMembers'))host.append(button('添加成员','plus',()=>{const resume={...draft};closeSettings();startCreation('add',g,resume);},'group-floating-action'));
       if(next==='admins'&&owner){host.append(note('点击成员可设置管理员和权限。'));host.append(button('选择管理员','plus',()=>showPage('members')));}
     }else if(next==='admin'){
@@ -277,15 +277,18 @@ window.chaweGroups = (() => {
     run(host,[{opacity:0,transform:same?'none':returning?'translateX(-24px)':'translateX(32px)'},{opacity:1,transform:'none'}],false);
   }
   function memberActions(person){const g=current();if(!g)return;const extra=node('div','group-member-actions');
-    if(g.myRole==='owner'&&person.id!==g.ownerId){extra.append(button(person.role==='admin'?'修改管理员权限':'设为管理员','settings',()=>{ctx.closeModal('group-confirm-dialog');showPage('admin',true,person);}));
-      extra.append(button('转让群主','user',()=>{confirm({title:'将群主转让给「'+ctx.title(person.username)+'」？',copy:'转让后你成为管理员，只有新群主可管理群类型、成员权限及删除群聊。',label:'确认转让',action:async()=>{await mutate('members/role',{userId:person.id,role:'owner',rights:''});draft=null;showPage('main');}});}));}
-    if(person.id!==g.ownerId&&canManage(g,'banUsers')&&(person.role!=='admin'||g.myRole==='owner'))extra.append(button('移除成员','trash',()=>confirm({title:'移除「'+ctx.title(person.username)+'」？',label:'确认移除',danger:true,action:async()=>{await mutate('members/remove',{userId:person.id});showPage('members');}}),'group-row danger-action'));
+    const owner=g.myRole==='owner'||g.superAdmin,protectedMember=person.superAdmin&&!g.superAdmin;
+    if(owner&&person.id!==g.ownerId&&!protectedMember){
+      if(!person.superAdmin)extra.append(button(person.role==='admin'?'修改管理员权限':'设为管理员','settings',()=>{ctx.closeModal('group-confirm-dialog');showPage('admin',true,person);}));
+      extra.append(button('设为群主','user',()=>{confirm({title:'将群主转让给「'+ctx.title(person.username)+'」？',copy:g.superAdmin?'现任群主将成为管理员。你的超级管理员权限继续保留。':'转让后你成为管理员，群主及超级管理员可管理群类型、成员权限及解散群聊。',label:'确认转让',action:async()=>{await mutate('members/role',{userId:person.id,role:'owner',rights:''});draft=null;showPage('main');}});}));}
+    if((person.id!==g.ownerId||g.superAdmin&&person.username!==ctx.account())&&!protectedMember&&canManage(g,'banUsers')&&(person.role!=='admin'||owner))extra.append(button('移除成员','trash',()=>confirm({title:'移除「'+ctx.title(person.username)+'」？',copy:person.id===g.ownerId?'移除现任群主后，你将成为群主。':'',label:'确认移除',danger:true,action:async()=>{await mutate('members/remove',{userId:person.id});showPage('members');}}),'group-row danger-action'));
+    if(person.superAdmin)extra.append(note('超级管理员拥有高于群主的权限，群内角色修改不会取消此权限。'));
     confirm({title:person.username===ctx.account()?ctx.myName():ctx.title(person.username),copy:'@'+person.username,extra,label:'关闭',action:async()=>{}});
   }
   function editTopic(t=null){const g=current();if(!g)return;const extra=node('div'),closed=node('input');closed.type='checkbox';closed.checked=!!t?.closed;const label=node('label','group-topic-closed','关闭此话题');label.prepend(closed);extra.append(label);
     confirm({title:t?'修改话题':'新建话题',input:'话题名称',value:t?.title || '',max:80,extra,label:'保存',action:async title=>{await mutate('topics/save',{topicId:t?.id || id(),title,closed:String(closed.checked)});showPage('topics');ctx.header();}});
   }
-  function deleteOrLeave(peer){const g=of(peer);if(!g?.joined)return;ctx.closeMenus();const owner=g.myRole==='owner';
+  function deleteOrLeave(peer,dissolve=false){const g=of(peer);if(!g?.joined)return;ctx.closeMenus();const owner=g.myRole==='owner'||dissolve&&g.superAdmin;
     confirm({title:owner?'删除群聊并退出？':'删除聊天并退出群聊？',copy:owner?'此群会对所有成员关闭。此操作无法撤销。你也可以先在成员设置中转让群主，再退出。':'退出后无法继续接收群消息。重新加入时历史可见范围由群设置决定。',label:owner?'删除群聊':'退出群聊',danger:true,action:async()=>{
       await ctx.post('/api/groups/'+(owner?'delete':'leave'),{id:g.id});groups.delete(g.id);closeSettings(true);ctx.leave(peer);await ctx.refresh();
     }});

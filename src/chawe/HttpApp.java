@@ -26,13 +26,14 @@ final class HttpApp implements HttpHandler {
     private UserProfiles userProfiles;
     private Avatars avatars;
     private AccountIdentities identities;
-    private final ReadReceipts readReceipts;
-    private final PushNotifications notifications;
-    private final Attachments attachments;
-    private final VoiceStore voices;
-    private final GroupStore groups;
-    private final PinStore pins;
-    private final ReactionStore reactions;
+    private AdminGrants adminGrants;
+    private ReadReceipts readReceipts;
+    private PushNotifications notifications;
+    private Attachments attachments;
+    private VoiceStore voices;
+    private GroupStore groups;
+    private PinStore pins;
+    private ReactionStore reactions;
     private final TypingStatus typing=new TypingStatus();
     private long lastPushMaintenance;
     private final java.util.concurrent.locks.ReentrantReadWriteLock lifecycle = new java.util.concurrent.locks.ReentrantReadWriteLock(true);
@@ -53,10 +54,11 @@ final class HttpApp implements HttpHandler {
         this.userProfiles = new UserProfiles(sessions.directory(), accounts);
         this.avatars = new Avatars(sessions.directory(), accounts);
         this.identities = new AccountIdentities(sessions.directory(),accounts);
+        this.adminGrants = new AdminGrants(sessions.directory());
         this.readReceipts = new ReadReceipts(sessions.directory());
         this.attachments = new Attachments(sessions.directory());
         this.voices = new VoiceStore(sessions.directory());
-        this.groups = new GroupStore(sessions.directory());
+        this.groups = new GroupStore(sessions.directory(),adminGrants.ids());
         this.pins = new PinStore(sessions.directory());
         this.reactions = new ReactionStore(sessions.directory());
         this.attachments.expire(identities,chats,groups);
@@ -79,7 +81,7 @@ final class HttpApp implements HttpHandler {
 
     @Override public void handle(HttpExchange exchange) throws IOException {
         String path = exchange.getRequestURI().getPath(), method = exchange.getRequestMethod();
-        java.util.concurrent.locks.Lock gate = method.equals("POST") && path.equals("/api/me/username") ? lifecycle.writeLock() : lifecycle.readLock();
+        java.util.concurrent.locks.Lock gate = method.equals("POST") && (path.equals("/api/me/username") || path.equals("/api/admin/accounts/delete")) ? lifecycle.writeLock() : lifecycle.readLock();
         if ((method.equals("GET") || method.equals("HEAD")) && (path.equals("/api/attachments/file") || path.equals("/api/attachments/download"))) { handleAttachmentFile(exchange); return; }
         if (method.equals("POST") && path.equals("/api/voice/play")) { handleOnceVoice(exchange); return; }
         gate.lock();
@@ -172,6 +174,7 @@ final class HttpApp implements HttpHandler {
                     case "/api/me/avatar" -> saveAvatar(exchange);
                     case "/api/me/avatar/reset" -> resetAvatar(exchange);
                     case "/api/me/username" -> renameUsername(exchange);
+                    case "/api/admin/accounts/delete" -> deleteAccount(exchange);
                     case "/api/notifications/save" -> saveNotifications(exchange);
                     case "/api/notifications/refresh" -> refreshNotificationSubscription(exchange);
                     case "/api/messages/send" -> sendMessage(exchange);
@@ -217,7 +220,7 @@ final class HttpApp implements HttpHandler {
         }
         Map<String, String> form = form(exchange);
         String username = form.get("username"), password = form.get("password");
-        if (!AccountStore.validUsername(username) || !Passwords.valid(password)) {
+        if (!AccountStore.validUsername(username) || AccountStore.reservedUsername(username) || !Passwords.valid(password)) {
             json(exchange, 400, "{\"error\":\"invalid_credentials\"}");
             return;
         }
@@ -341,6 +344,7 @@ final class HttpApp implements HttpHandler {
             json(exchange, 401, "{\"error\":\"unauthorized\"}");
         } else {
             json(exchange, 200, "{\"username\":" + quote(access.username()) + ",\"id\":" + quote(identities.id(access.username()))
+                + ",\"superAdmin\":" + adminGrants.contains(identities.id(access.username()))
                 + ",\"directoryVersion\":" + identities.generation() + ",\"nickname\":" + quote(userProfiles.nickname(access.username())) + avatarFields(access.username()) + "}");
         }
     }
@@ -368,6 +372,7 @@ final class HttpApp implements HttpHandler {
     private String selfProfileJson(UserProfiles.Profile profile) {
         StringBuilder result = new StringBuilder("{\"username\":").append(quote(profile.username()))
             .append(",\"id\":").append(quote(identities.id(profile.username())))
+            .append(",\"superAdmin\":").append(adminGrants.contains(identities.id(profile.username())))
             .append(",\"usernameChangeAllowedAt\":").append(identities.allowedAt(profile.username()) * 1000)
             .append(",\"nickname\":").append(quote(profile.nickname())).append(",\"birthday\":").append(quote(profile.birthday()))
             .append(",\"age\":").append(profile.birthday().isEmpty() ? "null" : UserProfiles.age(profile))
@@ -388,7 +393,7 @@ final class HttpApp implements HttpHandler {
         String user = requireUser(exchange); if (user == null) return;
         if (!rates.allow("rename:" + identities.id(user),5,60)) { json(exchange,429,"{\"error\":\"rate_limited\"}"); return; }
         String name = form(exchange).getOrDefault("username","").strip();
-        if (!AccountStore.validUsername(name)) { json(exchange,400,"{\"error\":\"invalid_username\"}"); return; }
+        if (!AccountStore.validUsername(name) || AccountStore.reservedUsername(name)) { json(exchange,400,"{\"error\":\"invalid_username\"}"); return; }
         if (name.equals(user)) { json(exchange,400,"{\"error\":\"username_unchanged\"}"); return; }
         long now = java.time.Instant.now().getEpochSecond();
         if (now < identities.allowedAt(user)) { json(exchange,429,"{\"error\":\"username_cooldown\"}"); return; }
@@ -414,7 +419,36 @@ final class HttpApp implements HttpHandler {
         RelationsStore r = new RelationsStore(directory,a); Sessions s = new Sessions(directory);
         BrowserAccounts b = new BrowserAccounts(directory); RegistrationDevices d = new RegistrationDevices(directory,a);
         UserProfiles p = new UserProfiles(directory,a); Avatars v = new Avatars(directory,a); AccountIdentities i = new AccountIdentities(directory,a);
+        AdminGrants grants = new AdminGrants(directory); GroupStore g = new GroupStore(directory,grants.ids());
+        ReadReceipts receipts = new ReadReceipts(directory); Attachments uploads = new Attachments(directory); VoiceStore recordings = new VoiceStore(directory);
+        PinStore pinned = new PinStore(directory); ReactionStore responses = new ReactionStore(directory); PushNotifications push = new PushNotifications(directory);
         accounts = a; chats = c; relations = r; sessions = s; browserAccounts = b; registrationDevices = d; userProfiles = p; avatars = v; identities = i;
+        adminGrants = grants; groups = g; readReceipts = receipts; attachments = uploads; voices = recordings; pins = pinned; reactions = responses; notifications = push;
+        notifications.prune(this::pushAuthorized);
+    }
+    private void deleteAccount(HttpExchange exchange) throws IOException, BadRequest {
+        String actor = requireUser(exchange); if(actor == null) return;
+        if(!adminGrants.contains(identities.id(actor))) { json(exchange,403,"{\"error\":\"super_admin_required\"}"); return; }
+        if(!rates.allow("account-delete:"+identities.id(actor),5,60)) { json(exchange,429,"{\"error\":\"rate_limited\"}"); return; }
+        Map<String,String> values = form(exchange); String id = values.get("id"), expected = values.get("username");
+        if(!AccountIdentities.validId(id) || !AccountStore.validUsername(expected)) throw new BadRequest();
+        String target = identities.username(id);
+        if(target == null) { json(exchange,404,"{\"error\":\"user_not_found\"}"); return; }
+        if(!target.equals(expected)) { json(exchange,409,"{\"error\":\"account_changed\"}"); return; }
+        Path directory = sessions.directory();
+        try {
+            RenameTransaction.deleteAccount(directory,target,id,identities.deleted(target),groups.accountDeleted(id));
+            reloadStores(directory);
+        } catch(IOException | RuntimeException error) {
+            unavailable = true;
+            try { RenameTransaction.recover(directory); reloadStores(directory); unavailable = false; }
+            catch(Exception recoveryError) { error.addSuppressed(recoveryError); }
+            if(unavailable || identities.username(id) != null) throw error;
+        }
+        if(actor.equals(target)) clearCookie(exchange,"__Host-chawe_session");
+        String browser = browserToken(exchange);
+        if(browserAccounts.access(browser) == null) clearCookie(exchange,"__Host-chawe_accounts");
+        json(exchange,200,"{\"ok\":true,\"deletedId\":"+quote(id)+",\"username\":"+quote(target)+"}");
     }
     private void avatarImage(HttpExchange exchange) throws IOException, BadRequest {
         Map<String,String> query = params(exchange);
@@ -539,6 +573,7 @@ final class HttpApp implements HttpHandler {
         String displayName = user.equals(peer) ? "收藏夹" : !person.alias().isEmpty() ? person.alias() : nickname.isEmpty() ? peer : nickname;
         return "{\"username\":" + quote(peer) + ",\"alias\":" + quote(person.alias())
             + ",\"id\":" + quote(identities.id(peer))
+            + ",\"superAdmin\":" + adminGrants.contains(identities.id(peer)) + ",\"canDeleteAccount\":" + adminGrants.contains(identities.id(user))
             + ",\"nickname\":" + quote(nickname) + avatarFields(peer) + ",\"displayName\":" + quote(displayName) + ",\"contact\":" + person.contact()
             + ",\"blockedByMe\":" + person.blockedByMe() + ",\"canMessage\":" + person.canMessage()
             + ",\"status\":" + quote(person.contact() ? "friend" : "none") + "}";
@@ -1317,6 +1352,7 @@ final class HttpApp implements HttpHandler {
             +",\"type\":"+quote(g.type)+",\"handle\":"+quote(g.handle)+",\"ownerId\":"+quote(g.owner)+",\"version\":"+g.version
             +",\"avatarUrl\":"+quote(avatarUrl)+",\"avatarVersion\":"+quote(g.avatar)+",\"memberCount\":"+g.members.size()
             +",\"joined\":"+(member!=null)+",\"canMessage\":"+(member!=null)+",\"myRole\":"+quote(member==null?"":member.role())
+            +",\"superAdmin\":"+GroupStore.supreme(g,uid)
             +",\"historyFloor\":"+(member==null?0:member.floor())+",\"history\":"+g.history+",\"topicsEnabled\":"+g.topicsEnabled
             +",\"reactionMode\":"+quote(g.reactionMode)+",\"allowedReactions\":"+stringArray(g.allowedReactions)+",\"permissions\":"+stringArray(g.permissions)
             +",\"myRights\":"+stringArray(member==null?java.util.Set.of():member.rights())+",\"members\":[");
@@ -1542,11 +1578,20 @@ final class HttpApp implements HttpHandler {
     private String messageJson(ChatStore.Message m) {return messageJson(m,null);}
     private String messageJson(ChatStore.Message m,String groupViewer) {
         var a = m.deleted() ? null : m.attachment();
+        String text = m.text();
+        // Group history remains readable after the upload owner or the last voice recipient is deleted.
+        if(a != null && a.kind().startsWith("voice")) {
+            try { voices.find(a.id()); }
+            catch(IllegalArgumentException error) {
+                if(!"voice_not_found".equals(error.getMessage())) throw error;
+                a = null; if(text.isEmpty()) text = "语音已删除";
+            }
+        }
         String attachment = a == null ? "null" : "{\"id\":" + quote(a.id()) + ",\"name\":" + quote(a.kind().equals("article") ? ChatStore.articleTitle(m.text()) : a.name())
             + ",\"type\":" + quote(a.type()) + ",\"size\":" + (a.kind().equals("article") ? m.text().getBytes(StandardCharsets.UTF_8).length : a.size()) + ",\"kind\":" + quote(a.kind())
             + (a.kind().startsWith("voice") ? voices.extraJson(a.id(),groupViewer) : "") + "}";
         return "{\"seq\":" + m.seq() + ",\"time\":" + m.time() + ",\"sender\":" + quote(m.sender())
-            + ",\"text\":" + quote(m.text()) + ",\"revision\":" + m.revision()
+            + ",\"text\":" + quote(text) + ",\"revision\":" + m.revision()
             + ",\"editedAt\":" + m.editedAt() + ",\"deleted\":" + m.deleted() + ",\"attachment\":" + attachment + "}";
     }
 

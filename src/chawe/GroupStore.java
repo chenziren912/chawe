@@ -29,18 +29,25 @@ final class GroupStore {
         Map<String,Topic> topics=new LinkedHashMap<>();
         Map<Long,Map<String,String>> reactions=new HashMap<>();
         Map<String,String> uploadTopics=new HashMap<>();
+        Set<String> superAdmins=Set.of();
         Group(String id) { this.id=id; }
         Group(Group before) {
             id=before.id;owner=before.owner;name=before.name;description=before.description;handle=before.handle;type=before.type;avatar=before.avatar;
             reactionMode=before.reactionMode;version=before.version;created=before.created;deleted=before.deleted;history=before.history;topicsEnabled=before.topicsEnabled;
             permissions=new HashSet<>(before.permissions);allowedReactions=new HashSet<>(before.allowedReactions);
             members=new LinkedHashMap<>(before.members);invites=new LinkedHashMap<>(before.invites);topics=new LinkedHashMap<>(before.topics);
+            superAdmins=before.superAdmins;
             before.reactions.forEach((seq,values)->reactions.put(seq,new HashMap<>(values)));uploadTopics=new HashMap<>(before.uploadTopics);
         }
     }
     private final Path index,avatarDirectory;
+    private final Set<String> superAdmins;
     private Map<String,Group> groups=new LinkedHashMap<>();
     GroupStore(Path data) throws IOException {
+        this(data,Set.of());
+    }
+    GroupStore(Path data,Set<String> superAdmins) throws IOException {
+        this.superAdmins=Set.copyOf(superAdmins);
         index=data.resolve("groups-v1.tsv");avatarDirectory=data.resolve("group-avatars");Files.createDirectories(avatarDirectory);
         Files.setPosixFilePermissions(avatarDirectory,EnumSet.of(PosixFilePermission.OWNER_READ,PosixFilePermission.OWNER_WRITE,PosixFilePermission.OWNER_EXECUTE));
         if(!Files.exists(index))return;
@@ -56,16 +63,19 @@ final class GroupStore {
     static boolean isPeer(String peer){return peer!=null&&peer.startsWith("group:")&&AccountIdentities.validId(peer.substring(6));}
     static String peer(String id){if(!AccountIdentities.validId(id))throw new IllegalArgumentException("group_not_found");return "group:"+id;}
     synchronized boolean exists(String id){return groups.containsKey(id);}
-    synchronized Group get(String id){Group g=groups.get(id);if(g==null||g.deleted)throw new IllegalArgumentException("group_not_found");return new Group(g);}
+    private Group decorated(Group g){Group copy=new Group(g);copy.superAdmins=superAdmins;return copy;}
+    synchronized Group get(String id){Group g=groups.get(id);if(g==null||g.deleted)throw new IllegalArgumentException("group_not_found");return decorated(g);}
     synchronized Group member(String id,String user){Group g=get(id);if(!g.members.containsKey(user))throw new IllegalArgumentException("group_not_member");return g;}
     synchronized List<Group> list(String user,String query,boolean global){
         String needle=query.replaceFirst("^@","").toLowerCase(Locale.ROOT);
         return groups.values().stream().filter(g->!g.deleted&&(global?g.type.equals("public"):g.members.containsKey(user)))
             .filter(g->needle.isEmpty()||g.name.toLowerCase(Locale.ROOT).contains(needle)||g.handle.toLowerCase(Locale.ROOT).contains(needle))
-            .map(Group::new).toList();
+            .map(this::decorated).toList();
     }
-    static boolean manages(Group g,String user,String right){Member m=g.members.get(user);return m!=null&&(m.role.equals("owner")||m.role.equals("admin")&&m.rights.contains(right));}
-    static boolean permits(Group g,String user,String permission){Member m=g.members.get(user);if(m==null)return false;if(m.role.equals("owner")||g.permissions.contains(permission))return true;
+    static boolean supreme(Group g,String user){return g.members.containsKey(user)&&g.superAdmins.contains(user);}
+    static boolean owns(Group g,String user){return g.owner.equals(user)||supreme(g,user);}
+    static boolean manages(Group g,String user,String right){Member m=g.members.get(user);return m!=null&&(supreme(g,user)||m.role.equals("owner")||m.role.equals("admin")&&m.rights.contains(right));}
+    static boolean permits(Group g,String user,String permission){Member m=g.members.get(user);if(m==null)return false;if(supreme(g,user)||m.role.equals("owner")||g.permissions.contains(permission))return true;
         String right=switch(permission){case "changeInfo"->"changeInfo";case "addMembers"->"inviteUsers";case "topics"->"manageTopics";case "pinMessages"->"pinMessages";default->null;};
         return m.role.equals("admin")&&(right==null||m.rights.contains(right));}
     synchronized void checkSend(String id,String user,String kind,String topic){
@@ -77,7 +87,7 @@ final class GroupStore {
     synchronized Group create(String id,String owner,String name,List<String> members) throws IOException {
         if(!AccountIdentities.validId(id))throw new IllegalArgumentException("invalid_group");
         if(groups.containsKey(id)){Group old=get(id);if(!old.owner.equals(owner))throw new IllegalArgumentException("invalid_group");return old;}
-        Group g=new Group(id);g.owner=owner;g.name=name.strip();g.created=Instant.now().toEpochMilli();
+        Group g=new Group(id);g.superAdmins=superAdmins;g.owner=owner;g.name=name.strip();g.created=Instant.now().toEpochMilli();
         g.members.put(owner,new Member(owner,"owner",Set.copyOf(ADMIN_RIGHTS),g.created,0));
         for(String user:members)g.members.putIfAbsent(user,new Member(user,"member",Set.of(),g.created,0));
         if(g.members.size()<2)throw new IllegalArgumentException("group_members_required");
@@ -91,11 +101,11 @@ final class GroupStore {
         if(fields.containsKey("name"))g.name=fields.get("name").strip();
         if(fields.containsKey("description"))g.description=fields.get("description").strip();
         if(fields.containsKey("type")){
-            if(!g.owner.equals(user))throw new IllegalArgumentException("group_owner_required");
+            if(!owns(g,user))throw new IllegalArgumentException("group_owner_required");
             g.type=fields.get("type");g.handle=g.type.equals("public")?fields.getOrDefault("handle","").toLowerCase(Locale.ROOT).strip():"";
             if(g.type.equals("public"))for(Group other:groups.values())if(!other.deleted&&!other.id.equals(id)&&other.handle.equals(g.handle))throw new IllegalArgumentException("group_handle_taken");
         }
-        if(fields.containsKey("permissions")){if(!g.owner.equals(user))throw new IllegalArgumentException("group_owner_required");g.permissions=csv(fields.get("permissions"));}
+        if(fields.containsKey("permissions")){if(!owns(g,user))throw new IllegalArgumentException("group_owner_required");g.permissions=csv(fields.get("permissions"));}
         if(fields.containsKey("history"))g.history=bool(fields.get("history"));
         if(fields.containsKey("topicsEnabled"))g.topicsEnabled=bool(fields.get("topicsEnabled"));
         if(fields.containsKey("reactionMode")){g.reactionMode=fields.get("reactionMode");g.allowedReactions=csv(fields.getOrDefault("allowedReactions",String.join(",",EMOJI)));}
@@ -107,21 +117,26 @@ final class GroupStore {
         validate(g);g.version++;commit(g);return g;
     }
     synchronized Group role(String id,String actor,String user,String role,Set<String> rights) throws IOException {
-        Group g=member(id,actor);if(!g.owner.equals(actor))throw new IllegalArgumentException("group_owner_required");
+        Group g=member(id,actor);if(!owns(g,actor))throw new IllegalArgumentException("group_owner_required");
+        if(superAdmins.contains(user)&&!supreme(g,actor))throw new IllegalArgumentException("super_admin_protected");
         if(user.equals(g.owner)||!g.members.containsKey(user)||!Set.of("owner","admin","member").contains(role)||!ADMIN_RIGHTS.containsAll(rights))throw new IllegalArgumentException("invalid_group_member");
-        if(role.equals("owner")){Member old=g.members.get(actor);g.members.put(actor,new Member(actor,"admin",Set.copyOf(ADMIN_RIGHTS),old.joined,old.floor));g.owner=user;rights=ADMIN_RIGHTS;}
+        if(role.equals("owner")){Member old=g.members.get(g.owner);g.members.put(old.id,new Member(old.id,"admin",Set.copyOf(ADMIN_RIGHTS),old.joined,old.floor));g.owner=user;rights=ADMIN_RIGHTS;}
         Member before=g.members.get(user);g.members.put(user,new Member(user,role,!role.equals("member")?Set.copyOf(rights):Set.of(),before.joined,before.floor));
         g.version++;commit(g);return g;
     }
     synchronized Group remove(String id,String actor,String user) throws IOException {
         Group g=member(id,actor);
         if(!actor.equals(user))requireRight(g,actor,"banUsers");
-        if(user.equals(g.owner))throw new IllegalArgumentException("group_owner_required");
+        if(!actor.equals(user)&&superAdmins.contains(user)&&!supreme(g,actor))throw new IllegalArgumentException("super_admin_protected");
+        if(user.equals(g.owner)){
+            if(!supreme(g,actor)||actor.equals(user))throw new IllegalArgumentException("group_owner_required");
+            Member successor=g.members.get(actor);g.owner=actor;g.members.put(actor,new Member(actor,"owner",Set.copyOf(ADMIN_RIGHTS),successor.joined,successor.floor));
+        }
         Member target=g.members.get(user);if(target==null)throw new IllegalArgumentException("invalid_group_member");
-        if(!actor.equals(user)&&target.role.equals("admin")&&!g.owner.equals(actor))throw new IllegalArgumentException("group_owner_required");
+        if(!actor.equals(user)&&target.role.equals("admin")&&!owns(g,actor))throw new IllegalArgumentException("group_owner_required");
         g.members.remove(user);g.version++;commit(g);return g;
     }
-    synchronized void delete(String id,String actor) throws IOException {Group g=member(id,actor);if(!g.owner.equals(actor))throw new IllegalArgumentException("group_owner_required");g.deleted=true;g.version++;commit(g);}
+    synchronized void delete(String id,String actor) throws IOException {Group g=member(id,actor);if(!owns(g,actor))throw new IllegalArgumentException("group_owner_required");g.deleted=true;g.version++;commit(g);}
     synchronized Group invite(String id,String actor,String revoke,long expires,int limit) throws IOException {
         Group g=member(id,actor);requireRight(g,actor,"inviteUsers");
         if(revoke!=null){Invite old=g.invites.get(revoke);if(old==null)throw new IllegalArgumentException("group_invite_invalid");g.invites.put(revoke,new Invite(old.token,old.creator,old.created,old.expires,old.limit,old.used,true));}
@@ -148,7 +163,7 @@ final class GroupStore {
         g.version++;commit(g);return g;
     }
     synchronized Group resolveInvite(String token){
-        long now=Instant.now().toEpochMilli();for(Group g:groups.values()){Invite i=g.invites.get(token);if(!g.deleted&&i!=null&&!i.revoked&&(i.expires==0||i.expires>now)&&(i.limit==0||i.used<i.limit))return new Group(g);}
+        long now=Instant.now().toEpochMilli();for(Group g:groups.values()){Invite i=g.invites.get(token);if(!g.deleted&&i!=null&&!i.revoked&&(i.expires==0||i.expires>now)&&(i.limit==0||i.used<i.limit))return decorated(g);}
         throw new IllegalArgumentException("group_invite_invalid");
     }
     synchronized Group join(String user,String id,String token,long lastSequence) throws IOException {
@@ -209,6 +224,28 @@ final class GroupStore {
         Map<String,Group> updated=new LinkedHashMap<>(groups);updated.put(g.id,new Group(g));StringBuilder out=new StringBuilder("# chawe-groups-v1\n");
         for(Group item:updated.values())out.append(item.id).append('\t').append(Base64.getEncoder().encodeToString(encode(item))).append('\n');
         RenameTransaction.atomicWrite(index,out.toString().getBytes(StandardCharsets.UTF_8));groups=updated;
+    }
+    synchronized byte[] accountDeleted(String user) throws IOException {
+        Map<String,Group> updated=new LinkedHashMap<>();
+        for(Group source:groups.values()) {
+            Group g=new Group(source);boolean changed=g.members.containsKey(user);
+            if(changed&&!g.deleted) {
+                if(g.owner.equals(user)) {
+                    String successor=g.members.keySet().stream().filter(id->!id.equals(user))
+                        .min(Comparator.comparingInt(id->superAdmins.contains(id)?0:g.members.get(id).role.equals("admin")?1:2)).orElse(null);
+                    if(successor==null)g.deleted=true;
+                    else {Member m=g.members.get(successor);g.owner=successor;g.members.put(successor,new Member(successor,"owner",Set.copyOf(ADMIN_RIGHTS),m.joined,m.floor));}
+                }
+                if(!g.deleted)g.members.remove(user);
+            }
+            for(var values:g.reactions.values())if(values.remove(user)!=null)changed=true;
+            g.reactions.values().removeIf(Map::isEmpty);
+            for(var invite:List.copyOf(g.invites.values()))if((g.deleted||invite.creator.equals(user))&&!invite.revoked){g.invites.put(invite.token,new Invite(invite.token,invite.creator,invite.created,invite.expires,invite.limit,invite.used,true));changed=true;}
+            if(changed)g.version++;validate(g);updated.put(g.id,g);
+        }
+        StringBuilder out=new StringBuilder("# chawe-groups-v1\n");
+        for(Group g:updated.values())out.append(g.id).append('\t').append(Base64.getEncoder().encodeToString(encode(g))).append('\n');
+        return out.toString().getBytes(StandardCharsets.UTF_8);
     }
     private static byte[] encode(Group g) throws IOException {
         Properties p=new Properties();p.setProperty("owner",g.owner);p.setProperty("name",g.name);p.setProperty("description",g.description);p.setProperty("type",g.type);p.setProperty("handle",g.handle);p.setProperty("avatar",g.avatar);

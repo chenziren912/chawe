@@ -47,9 +47,10 @@ final class AccountStore {
     static boolean validUsername(String name) {
         return name != null && USERNAME.matcher(name).matches();
     }
+    static boolean reservedUsername(String name){return name!=null&&name.startsWith("__deleted_");}
 
     synchronized RegisterResult register(String username, String password) throws IOException {
-        if (!validUsername(username) || !Passwords.valid(password)) return RegisterResult.INVALID;
+        if (!validUsername(username) || reservedUsername(username) || !Passwords.valid(password)) return RegisterResult.INVALID;
         if (accounts.containsKey(username)) return RegisterResult.EXISTS;
         if (accounts.size() >= MAX_USERS) return RegisterResult.FULL;
         Account account = new Account(username, Instant.now().getEpochSecond(), Passwords.create(password));

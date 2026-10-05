@@ -566,6 +566,7 @@ function errorText(error) {
     group_not_member:'你已不在此群聊中。',group_not_found:'群聊已不存在。',group_changed:'群设置已更新，请重新载入后保存。',group_permission_denied:'你没有执行此操作的权限。',group_owner_required:'此操作仅限群主。',group_handle_taken:'此群用户名已被使用。',group_members_required:'请至少选择一位联系人。',group_contacts_only:'只能选择你的联系人。',group_contact_required:'请选择你的联系人，并确认未被拉黑。',group_invite_invalid:'邀请链接已失效。',group_invite_limit:'邀请链接数量或设置超出限制。',group_topic_not_found:'该话题不存在。',group_topic_closed:'该话题已关闭。',group_voice_no_recipients:'群内没有其他可接收一次性语音的成员。',invalid_group:'请检查群名称、简介及用户名格式。',invalid_group_topic:'话题名称不能为空，最多 80 字。',group_reaction_disabled:'群聊未开放此表情回应。',pins_limit:'每个聊天最多置顶 100 条消息。',
     rate_limited:'操作太频繁，请稍后再试。',
     user_not_found:'没有找到此用户，请检查用户名。',
+    super_admin_required:'此操作需要超级管理员权限。',super_admin_protected:'群内角色操作不能移除超级管理员权限。',account_changed:'该账号已发生变化，请重新打开资料后确认。',
     invalid_user:'不能将自己添加为联系人或拉黑自己。',
     invalid_alias:'联系人备注最多 40 个字符，不能包含换行或控制字符。',
     invalid_message:'消息不能为空，最多 4000 字。',
@@ -601,7 +602,7 @@ function errorText(error) {
 function timeOf(ms) { return ms ? new Date(ms).toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'}) : ''; }
 function dayOf(ms) { return new Date(ms).toLocaleDateString('zh-CN',{year:'numeric',month:'long',day:'numeric'}); }
 function saved(peer) { return peer === me; }
-function titleOf(peer) { if(Groups.isGroup(peer))return Groups.of(peer)?.name || '群聊'; return saved(peer) ? '收藏夹' : contactDetails.get(peer)?.alias || userName(peer); }
+function titleOf(peer) { if(peer?.startsWith('__deleted_'))return '已删除账户'; if(Groups.isGroup(peer))return Groups.of(peer)?.name || '群聊'; return saved(peer) ? '收藏夹' : contactDetails.get(peer)?.alias || userName(peer); }
 function previewOf(chat) { return chat.lastText || (saved(chat.peer) ? '保存给自己的消息' : '@' + chat.peer); }
 function paintAvatar(node,peer,personal = false,name = peer === me ? userName(me) : titleOf(peer)) {
   if(Groups.isGroup(peer)){node.dataset.avatarPeer=peer;Groups.paintAvatar(node,Groups.of(peer));return;}
@@ -1153,6 +1154,7 @@ function openConfirm(action, peer) {
   ++confirmDialogRequest;
   const name = titleOf(peer);
   const actions = {
+    deleteAccount:{title:'永久删除账号 @'+peer+'？',copy:'将删除该账号、私聊和收藏夹、登录状态及上传的文件，用户名立即释放。群内文字消息保留并标记为已删除账户；该账号拥有的群聊会交给剩余成员，无成员时解散。此操作无法撤销。',label:'永久删除账号',path:'/api/admin/accounts/delete'},
     remove:{title:'删除联系人',copy:'将 ' + name + ' 从你的联系人中删除？仅影响你的列表，已有消息会保留，仍可继续聊天。',label:'删除',path:'/api/contacts/remove'},
     block:{title:'拉黑用户',copy:'拉黑 ' + name + ' 后，双方将无法发送新消息。已有聊天记录和联系人设置会保留。',label:'拉黑',path:'/api/blocks/add'},
     unblock:{title:'解除拉黑',copy:'解除对 ' + name + ' 的拉黑？解除后可重新发送消息，被拒绝的消息不会补发。',label:'解除拉黑',path:'/api/blocks/remove'},
@@ -1163,7 +1165,7 @@ function openConfirm(action, peer) {
       + '。旧用户名立即释放，每 15 天只能修改一次。确认后该账号在所有设备和浏览器退出登录。聊天、联系人和资料会保留。'
       + (ownInfoDirty ? ' 此页尚未保存的其他资料修改会丢弃。' : ''),label:'确认修改并退出',path:'/api/me/username'}
   };
-  confirmation = {...actions[action],peer,avatarVersion:ownProfile?.avatarVersion || 0,newUsername:$('my-info-username').value.trim()};
+  confirmation = {...actions[action],peer,accountId:activeProfile?.username===peer?activeProfile.id:null,avatarVersion:ownProfile?.avatarVersion || 0,newUsername:$('my-info-username').value.trim()};
   $('confirm-title').textContent = confirmation.title; $('confirm-copy').textContent = confirmation.copy;
   $('confirm-submit').textContent = confirmation.label; $('confirm-submit').disabled = false; $('confirm-cancel').disabled = false; $('confirm-error').hidden = true;
   openModal('confirm-dialog'); $('confirm-cancel').focus({preventScroll:true});
@@ -1213,6 +1215,8 @@ function renderProfile() {
   $('profile-remove').hidden = self || !info?.contact;
   $('profile-block').hidden = self; $('profile-block').disabled = !info;
   $('profile-block-label').textContent = info?.blockedByMe ? '解除拉黑' : '拉黑用户';
+  $('profile-delete-account').hidden = !info?.canDeleteAccount;
+  $('profile-delete-account').disabled = !info?.id;
 }
 async function loadActiveProfile() {
   if (!active) return;
@@ -2055,7 +2059,12 @@ $('confirm-form').addEventListener('submit',async event => {
   }
   try {
     const data = await post(action.path,action.path === '/api/me/avatar/reset' ? {revision:action.avatarVersion}
-      : action.path === '/api/me/username' ? {username:action.newUsername} : {peer:action.peer});
+      : action.path === '/api/me/username' ? {username:action.newUsername}
+      : action.path === '/api/admin/accounts/delete' ? {id:action.accountId,username:action.peer} : {peer:action.peer});
+    if(action.path === '/api/admin/accounts/delete') {
+      try { localStorage.setItem('chawe-auth-change-v1',JSON.stringify({id:data.deletedId,time:Date.now()})); } catch {}
+      location.replace(action.peer===me?'/':'/app?account='+encodeURIComponent(me)); return;
+    }
     if (action.path === '/api/me/username') {
       try { sessionStorage.removeItem('chawe_add_account_return'); localStorage.setItem('chawe-auth-change-v1',JSON.stringify({id:meIdentity,time:Date.now()})); } catch {}
       location.replace('/?add-account=1'); return;
@@ -2119,6 +2128,7 @@ $('close-profile').addEventListener('click',() => closeProfile());
 matchMedia('(max-width:640px)').addEventListener('change',syncProfileAccess);
 $('profile-contact').addEventListener('click',() => { if (active) openContactDialog(active); });
 $('profile-remove').addEventListener('click',() => { if (active) openConfirm('remove',active); });
+$('profile-delete-account').addEventListener('click',() => { if(activeProfile?.canDeleteAccount&&activeProfile.id&&!Groups.isGroup(active))openConfirm('deleteAccount',active); });
 function confirmActiveBlock() { if (activeProfile) openConfirm(activeProfile.blockedByMe ? 'unblock' : 'block',active); }
 $('profile-block').addEventListener('click',confirmActiveBlock);
 $('banner-add').addEventListener('click',() => { if (active) openContactDialog(active); });

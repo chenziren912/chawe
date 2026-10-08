@@ -40,6 +40,7 @@ final class HttpApp implements HttpHandler {
     private boolean unavailable;
     private final Path webDir;
     private final String origin;
+    private final String recommendedGroupId;
     private final String csp;
     private final RateLimiter rates = new RateLimiter();
 
@@ -59,6 +60,9 @@ final class HttpApp implements HttpHandler {
         this.attachments = new Attachments(sessions.directory());
         this.voices = new VoiceStore(sessions.directory());
         this.groups = new GroupStore(sessions.directory(),adminGrants.ids());
+        this.recommendedGroupId = System.getenv().getOrDefault("CHAWE_RECOMMENDED_GROUP_ID", "").strip();
+        if (!recommendedGroupId.isEmpty() && !AccountIdentities.validId(recommendedGroupId))
+            throw new IllegalArgumentException("CHAWE_RECOMMENDED_GROUP_ID must be a group ID");
         this.pins = new PinStore(sessions.directory());
         this.reactions = new ReactionStore(sessions.directory());
         this.attachments.expire(identities,chats,groups);
@@ -528,6 +532,20 @@ final class HttpApp implements HttpHandler {
         json(exchange, 200, result.append("]}").toString());
     }
 
+    private String recommendedGroupsJson(String user) {
+        if (recommendedGroupId.isEmpty()) return "[]";
+        try {
+            GroupStore.Group group = groups.get(recommendedGroupId);
+            // Recommendations never expose a private/deleted group or its member list.
+            if (!group.type.equals("public")) return "[]";
+            String uid = identities.id(user);
+            String avatarUrl = group.avatar.isEmpty() ? "" : "/api/groups/avatar?id=" + group.id + "&accountId=" + uid + "&v=" + group.avatar;
+            return "[{\"id\":" + quote(group.id) + ",\"name\":" + quote(group.name)
+                + ",\"avatarUrl\":" + quote(avatarUrl) + ",\"memberCount\":" + group.members.size()
+                + ",\"joined\":" + group.members.containsKey(uid) + "}]";
+        } catch (IllegalArgumentException missing) { return "[]"; }
+    }
+
     private void profile(HttpExchange exchange) throws IOException, BadRequest {
         String user = requireUser(exchange);
         if (user == null) return;
@@ -614,7 +632,8 @@ final class HttpApp implements HttpHandler {
                     .append(",\"profile\":").append(GroupStore.isPeer(chat.peer())?groupJson(groups.get(chat.peer().substring(6)),user):personJson(user, chat.peer())).append('}');
             }
         }
-        json(exchange, 200, result.append("]}").toString());
+        json(exchange, 200, result.append("],\"recommendedGroups\":")
+            .append(query.isEmpty() ? recommendedGroupsJson(user) : "[]").append('}').toString());
     }
 
     private void messages(HttpExchange exchange) throws IOException, BadRequest {

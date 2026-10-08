@@ -165,6 +165,20 @@
 .sidebar-page.side-panel{overflow-y:auto}
 .chats-page,.search-page{display:flex;flex-direction:column}
 .chats-page>.chat-list,.search-page>.chat-list{flex:1;min-height:0}
+.group-recommendations{margin:18px 10px 24px;padding:14px 8px 10px;border-top:1px solid var(--glass-border)}
+.group-recommendations h3{margin:0 8px 12px;font-size:13px;font-weight:600;color:var(--muted)}
+.group-recommendation-row{display:flex;align-items:center;gap:10px;padding:10px 8px;border-radius:16px;background:var(--glass-input);min-width:0}
+.group-recommendation-row>.avatar{width:42px;height:42px;flex:0 0 42px;font-size:20px}
+.group-recommendation-copy{display:flex;flex-direction:column;gap:5px;flex:1;min-width:0;text-align:left}
+.group-recommendation-copy strong{font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#263f54}
+.group-recommendation-copy small{font-size:11px;color:var(--muted)}
+.group-recommendation-join{display:inline-flex;align-items:center;justify-content:center;gap:6px;flex-shrink:0;min-width:64px;min-height:34px;padding:7px 12px;border-radius:999px;background:var(--accent);color:#fff;font-size:12px;font-weight:600;line-height:20px;transition:opacity var(--motion-160,160ms),background var(--motion-160,160ms)}
+.group-recommendation-join:hover{filter:brightness(1.06)}
+.group-recommendation-join:disabled{opacity:.65;cursor:default;transform:none}
+.group-recommendation-spinner{width:13px;height:13px;box-sizing:border-box;border:2px solid #ffffff60;border-top-color:#fff;border-radius:50%;animation:group-recommendation-spin .8s linear infinite}
+.group-recommendation-empty{margin:22px 18px 12px;text-align:center;color:var(--muted);font-size:12px;line-height:1.8}
+.group-recommendation-error{margin:10px 8px 0;font-size:12px;line-height:1.6;color:#bd4353;overflow-wrap:anywhere}
+@keyframes group-recommendation-spin{to{transform:rotate(360deg)}}
 .sidebar-page>.no-results{position:absolute;top:90px;left:20px;right:20px;line-height:1.7}
 .search-page{background:#f4f6f6}
 .search-page .chat-list{padding-bottom:20px}

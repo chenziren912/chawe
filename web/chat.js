@@ -15,6 +15,8 @@ const sendMotionWaiters = new Set();
 const SEND_MOTION_DURATION = 360, SEND_MOTION_EASING = 'cubic-bezier(.2,.8,.2,1)';
 let renderedPeer = null, catchupAfter = null;
 let me = '', active = null, chats = [], contacts = [], entries = [], hasOlder = false;
+let recommendedGroups = [];
+const recommendationJoin = {id:null,busy:false,error:''};
 let contactDetails = new Map(), blockedPeople = [], searchPeople = [];
 let panel = 'chats', listQuery = '', listError = '', peopleError = '';
 let searchActive = false, searchOriginPanel = 'chats';
@@ -1012,7 +1014,7 @@ function renderList() {
   if (active && !rows.some(chat => chat.peer === active) && !listQuery)
     rows.unshift({peer:active,lastText:'',lastAt:0});
   const people = listQuery ? searchPeople.filter(person => !rows.some(chat => chat.peer === person.username)) : [];
-  empty.hidden = panel !== 'chats' || rows.length !== 0 || people.length !== 0 || !!listError || !!peopleError;
+  empty.hidden = panel !== 'chats' || rows.length !== 0 || people.length !== 0 || !!listError || !!peopleError || (!searchActive && recommendedGroups.length > 0);
   if (listQuery && (rows.length || listError)) searchHeading(list,'聊天与联系人');
   if (listError) searchProblem(list,listError);
   for (const chat of rows) {
@@ -1031,7 +1033,57 @@ function renderList() {
   if (people.length || peopleError) searchHeading(list,'全局搜索');
   if (peopleError) searchProblem(list,peopleError);
   for (const person of people) list.append(personNode(person));
+  if (!searchActive && !listQuery) renderGroupRecommendations(list,rows.length === 0 && !listError);
   updateOpeningRows();
+}
+function renderGroupRecommendations(list,emptyChats) {
+  if (!recommendedGroups.length) return;
+  if (emptyChats) {
+    const hint = document.createElement('p'); hint.className = 'group-recommendation-empty';
+    hint.textContent = '还没有会话，加入群聊开始聊天吧'; list.append(hint);
+  }
+  const section = document.createElement('section'); section.className = 'group-recommendations'; section.setAttribute('aria-label','群聊推荐');
+  const heading = document.createElement('h3'); heading.textContent = '群聊推荐'; section.append(heading);
+  for (const group of recommendedGroups) {
+    const row = document.createElement('div'); row.className = 'group-recommendation-row';
+    const picture = document.createElement('span'); picture.className = 'avatar'; picture.setAttribute('aria-hidden','true'); Groups.paintAvatar(picture,group);
+    const copy = document.createElement('span'); copy.className = 'group-recommendation-copy';
+    const title = document.createElement('strong'); title.textContent = group.name;
+    const detail = document.createElement('small'); detail.textContent = '公开群 · ' + group.memberCount + ' 位成员'; copy.append(title,detail);
+    const button = document.createElement('button'); button.type = 'button'; button.className = 'group-recommendation-join';
+    const pending = recommendationJoin.busy && recommendationJoin.id === group.id;
+    button.disabled = recommendationJoin.busy || switchingAccount; button.setAttribute('aria-busy',String(pending));
+    button.setAttribute('aria-label',(group.joined ? '打开' : '加入') + group.name);
+    if (pending) { const spinner = document.createElement('span'); spinner.className = 'group-recommendation-spinner'; spinner.setAttribute('aria-hidden','true'); button.append(spinner); }
+    button.append(document.createTextNode(pending ? '加入中…' : group.joined ? '打开' : '加入'));
+    button.addEventListener('click',() => joinRecommendedGroup(group)); row.append(picture,copy,button); section.append(row);
+  }
+  if (recommendationJoin.error) { const error = document.createElement('p'); error.className = 'group-recommendation-error'; error.setAttribute('role','alert'); error.textContent = recommendationJoin.error; section.append(error); }
+  list.append(section);
+}
+async function joinRecommendedGroup(group) {
+  if (!me || switchingAccount || recommendationJoin.busy) return;
+  if (group.joined) { await openChat('group:'+group.id); return; }
+  if (Groups.isBusy() || window.chaweVoice.isBusy() || window.chaweArticles.isBusy()) { showStatus('请先完成当前操作，再加入群聊。'); return; }
+  const accountId = meIdentity, controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(),12000);
+  recommendationJoin.id = group.id; recommendationJoin.busy = true; recommendationJoin.error = ''; renderList();
+  try {
+    const joined = await api('/api/groups/join',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({id:group.id}),signal:controller.signal});
+    clearTimeout(timer);
+    if (accountId !== meIdentity || switchingAccount) return;
+    rememberPeople([joined]);
+    recommendedGroups = recommendedGroups.map(item => item.id === group.id ? {...item,joined:true,memberCount:joined.memberCount} : item);
+    recommendationJoin.busy = false; renderList();
+    await openChat('group:'+joined.id); loadChats();
+  } catch (error) {
+    if (accountId === meIdentity && !switchingAccount) {
+      recommendationJoin.error = error.name === 'AbortError' ? '加入请求超时。可以重试，已加入时不会重复添加。' : errorText(error);
+    }
+  } finally {
+    clearTimeout(timer); recommendationJoin.busy = false;
+    if (accountId === meIdentity && !switchingAccount) renderList();
+  }
 }
 function setSearchBusy(enabled) {
   enabled = !!enabled && searchActive && !!listQuery;
@@ -1050,6 +1102,10 @@ async function loadChats() {
       usernameQuery ? api('/api/groups/list?global=true&query='+encodeURIComponent(usernameQuery)) : Promise.resolve({groups:[]})
     ]);
     if (request !== listRequest || query !== listQuery) return;
+    if (!query && chatResult.status === 'fulfilled') {
+      const recommendations = chatResult.value.recommendedGroups;
+      recommendedGroups = Array.isArray(recommendations) ? recommendations.filter(group => /^[a-f0-9]{32}$/.test(group?.id) && typeof group.name === 'string' && Number.isSafeInteger(group.memberCount)) : [];
+    }
     chats = chatResult.status === 'fulfilled' ? chatResult.value.chats : query
       ? searchOriginChats.filter(chat => titleOf(chat.peer).toLowerCase().includes(query.toLowerCase())
         || chat.peer.toLowerCase().includes(usernameQuery.toLowerCase()) || (chat.lastText || '').toLowerCase().includes(query.toLowerCase()))

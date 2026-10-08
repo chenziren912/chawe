@@ -57,7 +57,7 @@ java -jar build/chawe.jar
 
 `CHAWE_PUBLIC_ORIGIN` 必须是 HTTPS 地址，不带结尾斜杠，并与浏览器访问的 Origin 一致。数据目录应仅供服务账户读写。
 
-可选配置 `CHAWE_RECOMMENDED_GROUP_ID` 为一个公开群的固定 ID，所有登录用户的会话列表下方会显示“群聊推荐”。未加入的用户可直接点击“加入”，已加入的用户可点击“打开”。不配置时不显示推荐；群被删除或改成私密后停止推荐。推荐列表只公开群名、头像、人数及当前账号是否已加入。
+可选配置 `CHAWE_RECOMMENDED_GROUP_ID` 为一个公开群的固定 ID，登录用户的会话列表下方会显示尚未加入的“群聊推荐”，点击“加入”直接入群。已加入时隐藏推荐。推荐区右上角可关闭推荐，在“通用设置 → 显示群聊推荐”中可重新开启；此偏好按账号保存在当前浏览器。不配置时不显示推荐；群被删除或改成私密后停止推荐。推荐列表只公开群名、头像、人数及当前账号是否已加入。
 
 将 [deploy/examples/Caddyfile](deploy/examples/Caddyfile) 中的域名替换为自己的域名，配置 Caddy 将 HTTPS 请求转发到 `127.0.0.1:8080`。
 长期运行可以参考 [deploy/examples/chawe.service](deploy/examples/chawe.service)：创建 `chawe` 系统用户，程序与网页放到 `/opt/chawe`，数据放到 `/var/lib/chawe`，修改域名后安装 systemd 服务。服务器更新时应保留旧程序及数据的恢复副本。

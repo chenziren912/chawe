@@ -166,7 +166,12 @@
 .chats-page,.search-page{display:flex;flex-direction:column}
 .chats-page>.chat-list,.search-page>.chat-list{flex:1;min-height:0}
 .group-recommendations{margin:18px 10px 24px;padding:14px 8px 10px;border-top:1px solid var(--glass-border)}
-.group-recommendations h3{margin:0 8px 12px;font-size:13px;font-weight:600;color:var(--muted)}
+.group-recommendations-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 10px}
+.group-recommendations-heading h3{margin:0 8px;font-size:13px;font-weight:600;color:var(--muted)}
+.group-recommendations-close{display:grid;place-items:center;width:30px;height:30px;flex:0 0 30px;border-radius:50%;background:transparent;color:var(--muted)}
+.group-recommendations-close svg{width:17px;height:17px}
+.group-recommendations-close:hover{background:var(--glass-hoverWhite);color:var(--accent)}
+.group-recommendations-close:disabled{opacity:.5;cursor:default;transform:none}
 .group-recommendation-row{display:flex;align-items:center;gap:10px;padding:10px 8px;border-radius:16px;background:var(--glass-input);min-width:0}
 .group-recommendation-row>.avatar{width:42px;height:42px;flex:0 0 42px;font-size:20px}
 .group-recommendation-copy{display:flex;flex-direction:column;gap:5px;flex:1;min-width:0;text-align:left}

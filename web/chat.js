@@ -17,6 +17,9 @@ let renderedPeer = null, catchupAfter = null;
 let me = '', active = null, chats = [], contacts = [], entries = [], hasOlder = false;
 let recommendedGroups = [];
 const recommendationJoin = {id:null,busy:false,error:''};
+const RECOMMENDATIONS_HIDDEN_PREFIX = 'chawe-group-recommendations-hidden-v1:';
+const recommendationVisibility = new Map();
+let recommendationSaveFailed = false;
 let contactDetails = new Map(), blockedPeople = [], searchPeople = [];
 let panel = 'chats', listQuery = '', listError = '', peopleError = '';
 let searchActive = false, searchOriginPanel = 'chats';
@@ -94,7 +97,8 @@ function renderUiSettings() {
   }
   $('settings-save-status').textContent = settingsSaveFailed
     ? '设置已生效，但浏览器未允许保存；刷新页面后可能恢复默认。'
-    : '设置自动保存在当前浏览器，对这里登录的所有账号生效。';
+    : '动画和外观设置自动保存在当前浏览器，对这里登录的所有账号生效。';
+  renderRecommendationSetting();
 }
 function applyUiSettings() {
   const root = document.documentElement, factor = uiSettings.transparency / UI_SETTINGS_DEFAULTS.transparency;
@@ -1005,6 +1009,7 @@ function renderSearchHome() {
   updateOpeningRows();
 }
 function renderList() {
+  renderRecommendationSetting();
   const list = $(searchActive ? 'search-results' : 'chat-list'), empty = $(searchActive ? 'search-no-results' : 'no-results');
   list.replaceChildren();
   $('search-home').hidden = !!listQuery;
@@ -1014,7 +1019,9 @@ function renderList() {
   if (active && !rows.some(chat => chat.peer === active) && !listQuery)
     rows.unshift({peer:active,lastText:'',lastAt:0});
   const people = listQuery ? searchPeople.filter(person => !rows.some(chat => chat.peer === person.username)) : [];
-  empty.hidden = panel !== 'chats' || rows.length !== 0 || people.length !== 0 || !!listError || !!peopleError || (!searchActive && recommendedGroups.length > 0);
+  const recommendations = !searchActive && !listQuery ? visibleGroupRecommendations() : [];
+  empty.hidden = panel !== 'chats' || rows.length !== 0 || people.length !== 0 || !!listError || !!peopleError || recommendations.length > 0;
+  empty.textContent = !searchActive && !listQuery ? '还没有会话，可通过新建开始聊天' : '没有找到相关聊天、联系人或用户';
   if (listQuery && (rows.length || listError)) searchHeading(list,'聊天与联系人');
   if (listError) searchProblem(list,listError);
   for (const chat of rows) {
@@ -1033,18 +1040,45 @@ function renderList() {
   if (people.length || peopleError) searchHeading(list,'全局搜索');
   if (peopleError) searchProblem(list,peopleError);
   for (const person of people) list.append(personNode(person));
-  if (!searchActive && !listQuery) renderGroupRecommendations(list,rows.length === 0 && !listError);
+  if (!searchActive && !listQuery) renderGroupRecommendations(list,rows.length === 0 && !listError,recommendations);
   updateOpeningRows();
 }
-function renderGroupRecommendations(list,emptyChats) {
-  if (!recommendedGroups.length) return;
+function recommendationsHidden() {
+  if (!meIdentity) return false;
+  if (!recommendationVisibility.has(meIdentity)) {
+    let hidden = false;
+    try { hidden = localStorage.getItem(RECOMMENDATIONS_HIDDEN_PREFIX + meIdentity) === '1'; } catch {}
+    recommendationVisibility.set(meIdentity,hidden);
+  }
+  return recommendationVisibility.get(meIdentity);
+}
+function visibleGroupRecommendations() {
+  return recommendationsHidden() ? [] : recommendedGroups.filter(group => !group.joined);
+}
+function renderRecommendationSetting() {
+  const toggle = $('setting-group-recommendations'), status = $('group-recommendations-save-status');
+  if (toggle) { toggle.checked = !recommendationsHidden(); toggle.disabled = !meIdentity; }
+  if (status) status.hidden = !recommendationSaveFailed;
+}
+function setRecommendationsHidden(hidden) {
+  if (!meIdentity) return;
+  recommendationVisibility.set(meIdentity,hidden); recommendationSaveFailed = false;
+  try { localStorage.setItem(RECOMMENDATIONS_HIDDEN_PREFIX + meIdentity,hidden ? '1' : '0'); }
+  catch { recommendationSaveFailed = true; }
+  renderList();
+}
+function renderGroupRecommendations(list,emptyChats,recommendations) {
+  if (!recommendations.length) return;
   if (emptyChats) {
     const hint = document.createElement('p'); hint.className = 'group-recommendation-empty';
     hint.textContent = '还没有会话，加入群聊开始聊天吧'; list.append(hint);
   }
   const section = document.createElement('section'); section.className = 'group-recommendations'; section.setAttribute('aria-label','群聊推荐');
-  const heading = document.createElement('h3'); heading.textContent = '群聊推荐'; section.append(heading);
-  for (const group of recommendedGroups) {
+  const header = document.createElement('div'); header.className = 'group-recommendations-heading';
+  const heading = document.createElement('h3'); heading.textContent = '群聊推荐';
+  const close = document.createElement('button'); close.type = 'button'; close.className = 'group-recommendations-close'; close.setAttribute('aria-label','关闭群聊推荐'); close.title = '关闭群聊推荐'; close.innerHTML = icon('close'); close.disabled = recommendationJoin.busy;
+  close.addEventListener('click',() => setRecommendationsHidden(true)); header.append(heading,close); section.append(header);
+  for (const group of recommendations) {
     const row = document.createElement('div'); row.className = 'group-recommendation-row';
     const picture = document.createElement('span'); picture.className = 'avatar'; picture.setAttribute('aria-hidden','true'); Groups.paintAvatar(picture,group);
     const copy = document.createElement('span'); copy.className = 'group-recommendation-copy';
@@ -1053,9 +1087,9 @@ function renderGroupRecommendations(list,emptyChats) {
     const button = document.createElement('button'); button.type = 'button'; button.className = 'group-recommendation-join';
     const pending = recommendationJoin.busy && recommendationJoin.id === group.id;
     button.disabled = recommendationJoin.busy || switchingAccount; button.setAttribute('aria-busy',String(pending));
-    button.setAttribute('aria-label',(group.joined ? '打开' : '加入') + group.name);
+    button.setAttribute('aria-label','加入' + group.name);
     if (pending) { const spinner = document.createElement('span'); spinner.className = 'group-recommendation-spinner'; spinner.setAttribute('aria-hidden','true'); button.append(spinner); }
-    button.append(document.createTextNode(pending ? '加入中…' : group.joined ? '打开' : '加入'));
+    button.append(document.createTextNode(pending ? '加入中…' : '加入'));
     button.addEventListener('click',() => joinRecommendedGroup(group)); row.append(picture,copy,button); section.append(row);
   }
   if (recommendationJoin.error) { const error = document.createElement('p'); error.className = 'group-recommendation-error'; error.setAttribute('role','alert'); error.textContent = recommendationJoin.error; section.append(error); }
@@ -1072,10 +1106,12 @@ async function joinRecommendedGroup(group) {
     const joined = await api('/api/groups/join',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({id:group.id}),signal:controller.signal});
     clearTimeout(timer);
     if (accountId !== meIdentity || switchingAccount) return;
+    // A list fetched before this join must not bring the recommendation back.
+    ++listRequest;
     rememberPeople([joined]);
     recommendedGroups = recommendedGroups.map(item => item.id === group.id ? {...item,joined:true,memberCount:joined.memberCount} : item);
     recommendationJoin.busy = false; renderList();
-    await openChat('group:'+joined.id); loadChats();
+    loadChats(); await openChat('group:'+joined.id);
   } catch (error) {
     if (accountId === meIdentity && !switchingAccount) {
       recommendationJoin.error = error.name === 'AbortError' ? '加入请求超时。可以重试，已加入时不会重复添加。' : errorText(error);
@@ -2062,9 +2098,13 @@ $('setting-transparency').addEventListener('input',event => updateUiSettings({tr
 $('setting-blur').addEventListener('change',event => updateUiSettings({blur:event.target.checked}));
 $('setting-ripples').addEventListener('change',event => updateUiSettings({ripples:event.target.checked}));
 $('reset-ui-settings').addEventListener('click',() => updateUiSettings(UI_SETTINGS_DEFAULTS));
+$('setting-group-recommendations')?.addEventListener('change',event => setRecommendationsHidden(!event.target.checked));
 reducedMotion.addEventListener('change',applyUiSettings);
 reducedTransparency.addEventListener('change',applyUiSettings);
 window.addEventListener('storage',event => {
+  if (event.key === RECOMMENDATIONS_HIDDEN_PREFIX + meIdentity || event.key === null) {
+    recommendationVisibility.delete(meIdentity); recommendationSaveFailed = false; renderList();
+  }
   if (event.key === 'chawe-auth-change-v1') {
     try {
       if (JSON.parse(event.newValue)?.id === meIdentity) location.replace('/?add-account=1');
